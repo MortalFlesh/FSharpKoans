@@ -1,5 +1,113 @@
 ﻿namespace FSharpKoans
 open FSharpKoans.Core
+open System.Globalization
+
+[<RequireQualifiedAccessAttribute>]
+module Solution1 =
+    let parseLines data =
+        let parseLine (line: string) =
+            line.Split(',')
+        
+        data
+        |> List.skip 1
+        |> List.map parseLine
+
+    let strToFloat (str: string) =
+        System.Double.Parse(str, CultureInfo.InvariantCulture)
+
+    let selectOpenAndClosePerDate lines =
+        lines
+        |> List.map(fun line ->
+            match line with
+            | [| date; open'; high; low; close; volume; adjClose|] ->
+                (
+                    date,
+                    (open' |> strToFloat, close |> strToFloat)
+                )
+            | _ -> failwithf "Line %A has a different shape" line
+        )
+        |> Map.ofList
+
+    let computeAbsoluteDifference lines =
+        lines
+        |> Map.map (fun _ (a: float, b: float) ->
+            (a - b) |> abs
+        )
+
+    let selectDateWithMaxDifference differencesPerDate =
+        differencesPerDate
+        |> Map.toList
+        |> List.maxBy snd
+        |> fst
+
+    let solution stockData = 
+        stockData
+            |> parseLines
+            |> selectOpenAndClosePerDate
+            |> computeAbsoluteDifference
+            |> selectDateWithMaxDifference
+
+[<RequireQualifiedAccessAttribute>]
+module Solution2 =
+    let parseLines data =
+        let parseLine (line: string) =
+            line.Split(',')
+
+        data
+        |> List.skip 1
+        |> List.map parseLine
+
+    let strToFloat (str: string) =
+        System.Double.Parse(str, CultureInfo.InvariantCulture)
+
+    let selectDifferencePerDate lines =
+        lines
+        |> List.map(fun line ->
+            match line with
+            | [| date; open'; high; low; close; volume; adjClose|] ->
+                let difference = ((open' |> strToFloat) - (close |> strToFloat)) |> abs
+                (date, difference)
+            | _ -> failwithf "Line %A has a different shape" line
+        )
+        |> Map.ofList
+
+    let selectDateWithMaxDifference differencesPerDate =
+        differencesPerDate
+        |> Map.toList
+        |> List.maxBy snd
+        |> fst
+
+    let solution stockData = 
+        stockData
+            |> parseLines
+            |> selectDifferencePerDate
+            |> selectDateWithMaxDifference
+
+[<RequireQualifiedAccessAttribute>]
+module Solution3 =
+    open System.Text.RegularExpressions
+
+    let (|Regex|_|) pattern input =
+        let m = Regex.Match(input, pattern)
+        if m.Success then Some(List.tail [ for g in m.Groups -> g.Value ])
+        else None
+
+    let parseLine line =
+        match line with
+        | Regex @"(\d{4}-\d{2}-\d{2}),(\d{2}.\d{2}),.*?,.*?,(\d{2}.\d{2}),.*?" [ date; open'; close ] ->
+            let diff =
+                [open'; close]
+                |> List.map (fun n -> System.Double.Parse(n, CultureInfo.InvariantCulture))
+                |> List.fold (fun diff n -> (diff - n) |> abs) 0.0
+            Some (date, diff)
+        | _ -> None
+
+    let solution stockData = 
+        stockData
+        |> List.map parseLine
+        |> List.choose id
+        |> List.maxBy snd
+        |> fst
 
 //---------------------------------------------------------------
 // Apply Your Knowledge!
@@ -58,8 +166,109 @@ module ``about the stock example`` =
     // tests for yourself along the way. You can also try 
     // using the F# Interactive window to check your progress.
 
+    let parseLines data =
+        let parseLine (line: string) =
+            line.Split(',')
+        
+        data
+        |> List.skip 1
+        |> List.map parseLine
+
+    let lines =
+        stockData
+        |> parseLines
+
+    [<Koan>]
+    let ShouldParseStockDataToLines() =
+        let firstLine =
+            lines
+            |> List.head
+
+        AssertEquality [| "2012-03-30"; "32.40"; "32.41"; "32.04"; "32.26"; "31749400"; "32.26" |] firstLine
+
+    let strToFloat (str: string) =
+        System.Double.Parse(str, CultureInfo.InvariantCulture)
+
+    let selectOpenAndClosePerDate lines =
+        lines
+        |> List.map(fun line ->
+            match line with
+            | [| date; open'; high; low; close; volume; adjClose|] ->
+                (
+                    date,
+                    (open' |> strToFloat, close |> strToFloat)
+                )
+            | _ -> failwithf "Line %A has a different shape" line
+        )
+        |> Map.ofList
+
+    let selectedPerDate =
+        lines
+        |> selectOpenAndClosePerDate
+
+    [<Koan>]
+    let ShouldSelectOpenAndClosePerDate() =
+        let firstLine =
+            selectedPerDate
+            |> Map.find "2012-03-30"
+
+        AssertEquality (32.40, 32.26) firstLine
+
+    let computeAbsoluteDifference lines =
+        lines
+        |> Map.map (fun _ (a: float, b: float) ->
+            (a - b) |> abs
+        )
+
+    let differenesPerDate =
+        selectedPerDate
+        |> computeAbsoluteDifference
+
+    [<Koan>]
+    let ShouldComputeAbsoluteDifference() =
+        let firstLine =
+            differenesPerDate
+            |> Map.find "2012-03-30"
+
+        AssertEquality "0.14" (firstLine |> string |> (fun s -> s.Substring(0, 4)))
+
+    let selectDateWithMaxDifference differencesPerDate =
+        differencesPerDate
+        |> Map.toList
+        |> List.maxBy snd
+        |> fst
+
     [<Koan>]
     let YouGotTheAnswerCorrect() =
-        let result =  __
-        
+        let result = 
+            stockData
+            |> parseLines
+            |> selectOpenAndClosePerDate
+            |> computeAbsoluteDifference
+            |> selectDateWithMaxDifference
+
+        AssertEquality "2012-03-13" result
+    
+    [<Koan>]
+    let YouGotTheAnswerCorrectWithSolution1() =
+        let result = 
+            stockData
+            |> Solution1.solution
+
+        AssertEquality "2012-03-13" result
+    
+    [<Koan>]
+    let YouGotTheAnswerCorrectWithSolution2() =
+        let result = 
+            stockData
+            |> Solution2.solution
+
+        AssertEquality "2012-03-13" result
+    
+    [<Koan>]
+    let YouGotTheAnswerCorrectWithSolution3() =
+        let result = 
+            stockData
+            |> Solution3.solution
+
         AssertEquality "2012-03-13" result
