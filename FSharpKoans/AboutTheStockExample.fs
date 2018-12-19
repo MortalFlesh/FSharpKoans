@@ -1,13 +1,27 @@
 ﻿namespace FSharpKoans
 open FSharpKoans.Core
 open System.Globalization
+open System.Threading.Tasks
+
+module Stats =
+    open System.Diagnostics
+
+    let measure name action =
+        let stopwatch = Stopwatch.StartNew()
+
+        let result = action()
+        stopwatch.Stop()
+
+        stopwatch.Elapsed.TotalMilliseconds
+        |> printfn "Action \"%s\" lasts: %0f ms" name
+        result
 
 [<RequireQualifiedAccessAttribute>]
 module Solution1 =
     let parseLines data =
         let parseLine (line: string) =
             line.Split(',')
-        
+
         data
         |> List.skip 1
         |> List.map parseLine
@@ -109,6 +123,41 @@ module Solution3 =
         |> List.maxBy snd
         |> fst
 
+[<RequireQualifiedAccessAttribute>]
+module Solution4 =
+    open System.Text.RegularExpressions
+
+    let (|Regex|_|) pattern input =
+        let m = Regex.Match(input, pattern)
+        if m.Success then Some(List.tail [ for g in m.Groups -> g.Value ])
+        else None
+
+    let parseLineAsync line =
+        async {
+            printfn "parse %s" line
+            return
+                match line with
+                | Regex @"(\d{4}-\d{2}-\d{2}),(\d{2}.\d{2}),.*?,.*?,(\d{2}.\d{2}),.*?" [ date; open'; close ] ->
+                    let diff =
+                        [open'; close]
+                        |> List.map (fun n -> System.Double.Parse(n, CultureInfo.InvariantCulture))
+                        |> List.fold (fun diff n -> (diff - n) |> abs) 0.0
+                    Some (date, diff)
+                | _ -> None
+        }
+
+    let solution stockData =
+        printfn "%A" stockData
+        stockData
+        |> List.map parseLineAsync
+        |> Async.Parallel
+        |> Async.RunSynchronously
+        |> Seq.maxBy (Option.map snd)
+        |> Option.map fst
+        |> function
+        | Some date -> date
+        | None -> "not-found"
+
 //---------------------------------------------------------------
 // Apply Your Knowledge!
 //
@@ -135,8 +184,24 @@ module Solution3 =
 //---------------------------------------------------------------
 [<Koan(Sort = 15)>]
 module ``about the stock example`` =
-    
-    let stockData =
+
+    let largeStockData totalCount =
+        let rnd = new System.Random()
+        let randomNumber () =
+            sprintf "%i.%02i" (rnd.Next(31,32)) (rnd.Next(0, 99))
+
+        "Date,Open,High,Low,Close,Volume,Adj Close"
+        ::
+        [for _ in 1..totalCount do
+            yield sprintf "2012-03-%02i,%s,%i,%s"
+                <| rnd.Next(1, 30)
+                <| ([for _ in 0..3 do yield (randomNumber())] |> String.concat(","))
+                <| rnd.Next(10000000, 90000000)
+                <| randomNumber()
+        ]
+        @ ["2012-03-13,32.24,32.69,32.15,36.14,48951700,32.44"]
+
+    let stockData' =
         [ "Date,Open,High,Low,Close,Volume,Adj Close";
           "2012-03-30,32.40,32.41,32.04,32.26,31749400,32.26";
           "2012-03-29,32.06,32.19,31.81,32.12,37038500,32.12";
@@ -161,7 +226,9 @@ module ``about the stock example`` =
           "2012-03-02,32.31,32.44,32.00,32.08,47314200,32.08";
           "2012-03-01,31.93,32.39,31.85,32.29,77344100,32.29";
           "2012-02-29,31.89,32.00,31.61,31.74,59323600,31.74"; ]
-    
+
+    let stockData = largeStockData 10
+
     // Feel free to add extra [<Koan>] members here to write
     // tests for yourself along the way. You can also try 
     // using the F# Interactive window to check your progress.
@@ -178,7 +245,7 @@ module ``about the stock example`` =
         stockData
         |> parseLines
 
-    [<Koan>]
+    //[<Koan>]
     let ShouldParseStockDataToLines() =
         let firstLine =
             lines
@@ -206,7 +273,7 @@ module ``about the stock example`` =
         lines
         |> selectOpenAndClosePerDate
 
-    [<Koan>]
+    //[<Koan>]
     let ShouldSelectOpenAndClosePerDate() =
         let firstLine =
             selectedPerDate
@@ -224,7 +291,7 @@ module ``about the stock example`` =
         selectedPerDate
         |> computeAbsoluteDifference
 
-    [<Koan>]
+    //[<Koan>]
     let ShouldComputeAbsoluteDifference() =
         let firstLine =
             differenesPerDate
@@ -241,34 +308,53 @@ module ``about the stock example`` =
     [<Koan>]
     let YouGotTheAnswerCorrect() =
         let result = 
-            stockData
-            |> parseLines
-            |> selectOpenAndClosePerDate
-            |> computeAbsoluteDifference
-            |> selectDateWithMaxDifference
+            Stats.measure "solution 0" (fun _ ->
+                stockData
+                |> parseLines
+                |> selectOpenAndClosePerDate
+                |> computeAbsoluteDifference
+                |> selectDateWithMaxDifference
+            )
 
         AssertEquality "2012-03-13" result
-    
+
+
     [<Koan>]
     let YouGotTheAnswerCorrectWithSolution1() =
-        let result = 
-            stockData
-            |> Solution1.solution
+        let result =
+            Stats.measure "solution 1" (fun _ ->
+                stockData
+                |> Solution1.solution
+            )
 
         AssertEquality "2012-03-13" result
-    
+
     [<Koan>]
     let YouGotTheAnswerCorrectWithSolution2() =
         let result = 
-            stockData
-            |> Solution2.solution
+            Stats.measure "solution 2" (fun _ ->
+                stockData
+                |> Solution2.solution
+            )
 
         AssertEquality "2012-03-13" result
-    
+
     [<Koan>]
     let YouGotTheAnswerCorrectWithSolution3() =
+        let result =
+            Stats.measure "solution 3" (fun _ ->
+                stockData
+                |> Solution3.solution
+            )
+
+        AssertEquality "2012-03-13" result
+
+    [<Koan>]
+    let YouGotTheAnswerCorrectWithSolution4() =
         let result = 
-            stockData
-            |> Solution3.solution
+            Stats.measure "solution 4" (fun _ ->
+                stockData
+                |> Solution4.solution
+            )
 
         AssertEquality "2012-03-13" result
