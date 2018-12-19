@@ -132,16 +132,28 @@ module Solution4 =
         if m.Success then Some(List.tail [ for g in m.Groups -> g.Value ])
         else None
 
+    type Line = {
+        date: string
+        diff: float
+    }
+
+    let (|LinePattern|_|) line =
+        match line with
+        | Regex @"(\d{4}-\d{2}-\d{2}),(\d{2}.\d{2}),.*?,.*?,(\d{2}.\d{2}),.*?" [ date; open'; close ] ->
+            Some {
+                date = date
+                diff =
+                    [open'; close]
+                    |> List.map (fun n -> System.Double.Parse(n, CultureInfo.InvariantCulture))
+                    |> List.fold (fun diff n -> (diff - n) |> abs) 0.0
+            }
+        | _ -> None
+
     let parseLineAsync line =
         async {
             return
                 match line with
-                | Regex @"(\d{4}-\d{2}-\d{2}),(\d{2}.\d{2}),.*?,.*?,(\d{2}.\d{2}),.*?" [ date; open'; close ] ->
-                    let diff =
-                        [open'; close]
-                        |> List.map (fun n -> System.Double.Parse(n, CultureInfo.InvariantCulture))
-                        |> List.fold (fun diff n -> (diff - n) |> abs) 0.0
-                    Some (date, diff)
+                | LinePattern { date = date; diff = diff } -> Some (date, diff)
                 | _ -> None
         }
 
