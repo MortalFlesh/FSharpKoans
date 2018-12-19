@@ -134,7 +134,6 @@ module Solution4 =
 
     let parseLineAsync line =
         async {
-            printfn "parse %s" line
             return
                 match line with
                 | Regex @"(\d{4}-\d{2}-\d{2}),(\d{2}.\d{2}),.*?,.*?,(\d{2}.\d{2}),.*?" [ date; open'; close ] ->
@@ -147,7 +146,6 @@ module Solution4 =
         }
 
     let solution stockData =
-        printfn "%A" stockData
         stockData
         |> List.map parseLineAsync
         |> Async.Parallel
@@ -187,11 +185,10 @@ module ``about the stock example`` =
 
     let largeStockData totalCount =
         let rnd = new System.Random()
-        let randomNumber () =
-            sprintf "%i.%02i" (rnd.Next(31,32)) (rnd.Next(0, 99))
+        let randomNumber () = sprintf "%i.%02i" (rnd.Next(31,32)) (rnd.Next(0, 99))
 
-        "Date,Open,High,Low,Close,Volume,Adj Close"
-        ::
+        "Date,Open,High,Low,Close,Volume,Adj Close" ::
+        "2012-03-13,32.24,32.69,32.15,36.14,48951700,32.44" ::
         [for _ in 1..totalCount do
             yield sprintf "2012-03-%02i,%s,%i,%s"
                 <| rnd.Next(1, 30)
@@ -199,7 +196,6 @@ module ``about the stock example`` =
                 <| rnd.Next(10000000, 90000000)
                 <| randomNumber()
         ]
-        @ ["2012-03-13,32.24,32.69,32.15,36.14,48951700,32.44"]
 
     let stockData' =
         [ "Date,Open,High,Low,Close,Volume,Adj Close";
@@ -227,7 +223,7 @@ module ``about the stock example`` =
           "2012-03-01,31.93,32.39,31.85,32.29,77344100,32.29";
           "2012-02-29,31.89,32.00,31.61,31.74,59323600,31.74"; ]
 
-    let stockData = largeStockData 10
+    let stockData = largeStockData 10000
 
     // Feel free to add extra [<Koan>] members here to write
     // tests for yourself along the way. You can also try 
